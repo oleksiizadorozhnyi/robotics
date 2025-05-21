@@ -70,14 +70,14 @@ def low_battery():
                 img = top_cam.get_image()
                 height, width, _ = img.shape
 
-                # Центровка по вертикальной средней полосе
+                # Center on the vertical middle strip
                 center_col = img[:, width // 2 - 1: width // 2 + 1]
                 r = center_col[:, :, 0].astype(int)
                 g = center_col[:, :, 1].astype(int)
                 b = center_col[:, :, 2].astype(int)
                 center_mask = is_charging_area(r, g, b)
 
-                # Центровка: если центр жёлтый — двигаться вперёд с коррекцией
+                # Centering: if the strip is yellow, move forward with correction
                 ys, xs = np.where(center_mask)
                 if len(ys) > 0:
                     cy = np.mean(ys)
@@ -89,7 +89,7 @@ def low_battery():
                     left_motor.run(1)
                     right_motor.run(1)
 
-                # Проверка нижней строки — остановка
+                # Check bottom row for alignment and stop
                 bottom = img[-2:]
                 rb = bottom[:, :, 0].astype(int)
                 gb = bottom[:, :, 1].astype(int)
@@ -104,7 +104,7 @@ def low_battery():
                     time.sleep(4)
                     break
 
-                # Проверка на заслонение
+                # Check if camera view is obstructed
                 full_r = img[:, :, 0].astype(int)
                 full_g = img[:, :, 1].astype(int)
                 full_b = img[:, :, 2].astype(int)
@@ -167,7 +167,7 @@ def trash_detected():
                 small_cam._update_image()
                 small_img = small_cam.get_image()
                 height, width, _ = small_img.shape
-                center_crop = small_img[:, width // 3:2 * width // 3]
+                center_crop = small_img[20:, width // 3:2 * width // 3]
                 r = center_crop[:, :, 0].astype(int)
                 g = center_crop[:, :, 1].astype(int)
                 b = center_crop[:, :, 2].astype(int)
@@ -237,13 +237,23 @@ def compressed_trash_detected():
                 b_t = img_t[:, :, 2].astype(int)
                 mask_red = is_red_basket(r_t, g_t, b_t)
                 coverage = np.count_nonzero(mask_red) / mask_red.size
-                if coverage >= 0.6:
+                print(f"basket coverage {coverage}")
+                if coverage >= 0.4:
                     left_motor.run(0)
                     right_motor.run(0)
                     return
-                # Drive forward toward basket
-                left_motor.run(1)
-                right_motor.run(1)
+                # Steer toward basket based on its centroid
+                ys, xs = np.where(mask_red)
+                if len(xs) > 0:
+                    cx = xs.mean()
+                    error = (cx - img_t.shape[1] / 2) / (img_t.shape[1] / 2)
+                    steer = -0.5 * error
+                    left_motor.run(1 - steer)
+                    right_motor.run(1 + steer)
+                else:
+                    # No centroid found, drive straight
+                    left_motor.run(1)
+                    right_motor.run(1)
             return
     # Stop motors if exiting without finding
     left_motor.run(0)
@@ -290,7 +300,8 @@ if __name__ == "__main__":
                 trash_detected()
             elif object_type == 'plant':
                 plants_detected()
-            continue
+            left_motor.run(0.2)
+            right_motor.run(-0.2)
         else:
             left_motor.run(0.2)
             right_motor.run(-0.2)
