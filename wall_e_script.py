@@ -28,8 +28,9 @@ def is_charging_area(r, g, b):
 
 # Red basket detection
 def is_red_basket(r, g, b):
-    # Detect strong red regions: red channel high, significantly above green/blue
-    return (r > 150) & (g < 100) & (b < 100) & ((r - g) > 60) & ((r - b) > 60)
+    # Detect bright red basket: red channel very high and clearly dominant over green/blue
+    # Excludes darker burgundy tones
+    return (r > 120) & (r > 1.5 * g) & (r > 1.5 * b)
 
 # Log similar colors in the current image that match the wider target color range
 def log_similar_colors(image):
@@ -174,7 +175,7 @@ def trash_detected():
                 mask_trash = is_compressed_trash(r, g, b)
                 count_trash = int(np.count_nonzero(mask_trash))
                 print("colichestvo")
-                if count_trash > 30:
+                if count_trash > 40:
                     print("mnogo chernih")
                     left_motor.run(0.5)
                     right_motor.run(0.5)
@@ -238,7 +239,7 @@ def compressed_trash_detected():
                 mask_red = is_red_basket(r_t, g_t, b_t)
                 coverage = np.count_nonzero(mask_red) / mask_red.size
                 print(f"basket coverage {coverage}")
-                if coverage >= 0.4:
+                if coverage >= 0.85:
                     left_motor.run(0)
                     right_motor.run(0)
                     return
